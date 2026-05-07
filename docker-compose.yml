@@ -1,0 +1,35 @@
+services:
+  api:
+    build:
+      context: .
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://hangar:hangar@postgres:5432/hangar}
+      HANGAR_ADMIN_TOKEN: ${HANGAR_ADMIN_TOKEN:-dev-admin-token}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      HANGAR_RUNTIME_MODE: ${HANGAR_RUNTIME_MODE:-docker}
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - hangar_sessions:/var/lib/hangar/sessions
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: hangar
+      POSTGRES_PASSWORD: hangar
+      POSTGRES_USER: hangar
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hangar -d hangar"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  hangar_sessions:
+  postgres_data:

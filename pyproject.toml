@@ -1,0 +1,67 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "hangar"
+version = "0.1.0.dev0"
+description = "Self-hostable API-compatible runtime for Claude Managed Agents."
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+license = "Apache-2.0"
+authors = [{ name = "Hangar contributors" }]
+dependencies = [
+    "alembic>=1.13,<2.0",
+    "argon2-cffi>=23.1,<24.0",
+    "asyncpg>=0.30,<1.0",
+    "claude-agent-sdk>=0.1.76,<0.2.0",
+    "dbos>=1.0,<2.0",
+    "docker>=7.1,<8.0",
+    "fastapi>=0.115,<0.116",
+    "mcp>=1.10,<2.0",
+    "pydantic>=2.9,<3.0",
+    "sqlalchemy[asyncio]>=2.0,<3.0",
+    "sse-starlette>=2.1,<3.0",
+    "structlog>=24.4,<25.0",
+    "typer>=0.13,<0.14",
+    "uvicorn[standard]>=0.32,<0.33",
+]
+
+[project.scripts]
+hangar = "hangar.cli.main:app"
+
+[dependency-groups]
+dev = [
+    "anthropic>=0.72,<1.0",
+    "httpx>=0.27,<1.0",
+    "mypy>=1.13,<2.0",
+    "pytest>=8.3,<9.0",
+    "pytest-asyncio>=0.24,<1.0",
+    "pytest-cov>=6.0,<7.0",
+    "ruff>=0.7,<0.8",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["A", "ASYNC", "B", "C4", "E", "F", "I", "RUF", "T20", "UP"]
+ignore = ["ASYNC109"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unused_ignores = true
+show_error_codes = true
+
+[[tool.mypy.overrides]]
+module = ["docker", "docker.*"]
+ignore_missing_imports = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/hangar"]
