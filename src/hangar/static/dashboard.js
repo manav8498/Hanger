@@ -477,7 +477,7 @@ function eventSummary(type, content) {
   if (type === "session.error") summary = content.message || "error";
   if (type === "agent.tool_use") summary = content.name || "tool";
   if (type === "span.model_request_end") summary = JSON.stringify(content.usage || content);
-  return clip(summary, 180);
+  return clip(summary, 200);
 }
 
 function contentText(content) {

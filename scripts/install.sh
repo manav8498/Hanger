@@ -163,6 +163,12 @@ Hangar is running.
 Dashboard:  http://localhost:8080/dashboard/
 API:        http://localhost:8080/
 
+Security note: this stack accepts \`hgr_test_key\` as a
+valid API key by default for local development. Before
+exposing port 8080 beyond localhost, add
+\`HANGAR_ACCEPT_TEST_KEY=0\` to .env and \`docker compose
+restart api\`.
+
 To create your first API key:
   cd $INSTALL_DIR
   docker compose exec api hangar admin create-api-key --name dev
