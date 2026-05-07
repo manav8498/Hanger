@@ -14,6 +14,17 @@ If you already use the Anthropic Python SDK and want to point it at your own ser
 
 ## Quickstart
 
+### One-line install
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/manav8498/Hangar/main/scripts/install.sh | sh
+```
+
+The script clones the repo to `~/hangar`, generates a random admin token, brings up `docker compose`, and waits for the stack to be healthy.
+Use `HANGAR_DIR=/path/to/dir` to install elsewhere, or pass `--force` with `sh -s -- --force` to overwrite an existing install.
+
+### Manual install
+
 ```sh
 git clone https://github.com/manav8498/Hangar.git
 cd Hangar
