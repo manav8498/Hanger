@@ -357,7 +357,7 @@ def admin_health(ctx: typer.Context) -> None:
     Example: hangar admin health
     """
 
-    _print_json(_request_json(ctx, "GET", "/", authenticated=False))
+    _print_health(_request_json(ctx, "GET", "/healthz", authenticated=False))
 
 
 @app.command("version")
@@ -546,6 +546,45 @@ def _print_json(data: JsonObject) -> None:
     _out().print_json(data=data)
 
 
+def _print_health(data: JsonObject) -> None:
+    version = str(data.get("version", "unknown"))
+    status = str(data.get("status", "unknown"))
+    _out().print(f"Hangar {version} - [{_status_style(status)}]{status}[/{_status_style(status)}]")
+
+    components = data.get("components")
+    if not isinstance(components, dict):
+        return
+    for name in ("database", "dbos", "docker"):
+        component = components.get(name)
+        if isinstance(component, dict):
+            component_status = str(component.get("status", "unknown"))
+            detail = _component_detail(component)
+            _out().print(
+                f"  {name:<8} [{_status_style(component_status)}]{component_status:<8}"
+                f"[/{_status_style(component_status)}] ({detail})"
+            )
+
+
+def _status_style(status: str) -> str:
+    return {
+        "ok": "green",
+        "degraded": "yellow",
+        "error": "red",
+        "skipped": "dim",
+    }.get(status, "white")
+
+
+def _component_detail(component: JsonObject) -> str:
+    if isinstance(component.get("latency_ms"), int):
+        return f"{component['latency_ms']}ms"
+    if isinstance(component.get("active_workflows"), int):
+        return f"{component['active_workflows']} workflows"
+    if isinstance(component.get("container_count"), int):
+        return f"{component['container_count']} containers"
+    reason = component.get("reason")
+    return str(reason) if reason is not None else "-"
+
+
 def _auth_headers(config: CliConfig) -> dict[str, str]:
     return {"x-api-key": config.api_key}
 
@@ -576,11 +615,11 @@ def _config(ctx: typer.Context) -> CliConfig:
 
 
 def _out() -> Console:
-    return Console(color_system=None, highlight=False)
+    return Console(highlight=False)
 
 
 def _err() -> Console:
-    return Console(stderr=True, color_system=None, highlight=False)
+    return Console(stderr=True, highlight=False)
 
 
 def _fail(message: str) -> None:

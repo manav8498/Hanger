@@ -10,7 +10,14 @@ from fastapi.requests import Request
 from fastapi.responses import JSONResponse
 
 from hangar import __version__
-from hangar.api.routes import agents, api_keys, environments, events, sessions
+from hangar.api.routes import (
+    agents,
+    api_keys,
+    environments,
+    events,
+    sessions,
+)
+from hangar.api.routes import health as health_routes
 from hangar.db.models import Base
 from hangar.db.session import make_engine, make_sessionmaker
 from hangar.store import MemoryStore, PostgresStore, Store
@@ -36,6 +43,7 @@ app.include_router(agents.router)
 app.include_router(environments.router)
 app.include_router(sessions.router)
 app.include_router(events.router)
+app.include_router(health_routes.router)
 
 
 @app.get("/")

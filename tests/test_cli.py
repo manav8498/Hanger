@@ -77,7 +77,10 @@ def test_admin_create_api_key_and_health(runner: CliRunner) -> None:
 
     assert created.exit_code == 0
     assert created.output.strip().startswith("hgr_")
-    assert _json(health)["hangar"] == "ok"
+    assert "Hangar 0.1.0-dev" in health.output
+    assert "database" in health.output
+    assert "dbos" in health.output
+    assert "docker" in health.output
 
 
 def test_agent_commands(runner: CliRunner) -> None:
