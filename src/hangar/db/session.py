@@ -4,6 +4,7 @@ import os
 from collections.abc import AsyncIterator
 
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.pool import NullPool
 
 DEFAULT_DATABASE_URL = "postgresql+asyncpg://hangar:hangar@localhost:5432/hangar"
 
@@ -13,7 +14,7 @@ def database_url() -> str:
 
 
 def make_engine(url: str | None = None) -> AsyncEngine:
-    return create_async_engine(url or database_url(), pool_pre_ping=True)
+    return create_async_engine(url or database_url(), pool_pre_ping=True, poolclass=NullPool)
 
 
 def make_sessionmaker(engine: AsyncEngine) -> async_sessionmaker[AsyncSession]:

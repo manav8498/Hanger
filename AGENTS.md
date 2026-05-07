@@ -30,7 +30,7 @@ event log. SSE streams events from Postgres LISTEN/NOTIFY. The Claude Agent SDK
 - async/await throughout — no sync FastAPI routes
 - Ruff for lint, mypy strict for typecheck
 - Tests in `tests/`, one file per route module + `tests/e2e/`
-- Use `structlog` for logging, JSON output in production, pretty in dev
+- Use standard-library `logging`; keep messages structured with `extra` where useful
 - All API errors return `{"error": {"type": "...", "message": "..."}}` shape
   (matches Anthropic SDK error parsing)
 
@@ -58,7 +58,6 @@ event log. SSE streams events from Postgres LISTEN/NOTIFY. The Claude Agent SDK
 
 ## Useful commands
 - `make dev` — `docker compose up -d`, tails logs
-- `make migrate` — `alembic upgrade head`
 - `make test` — pytest
 - `make compat` — pytest -k compat (requires stack running)
 - `make lint typecheck` — ruff + mypy

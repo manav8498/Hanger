@@ -1,27 +1,75 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 from collections.abc import AsyncIterator
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
 import docker
 from claude_agent_sdk import ClaudeAgentOptions, query
 
 from hangar.runtime.container import _outputs_path
-from hangar.store import Store
+from hangar.store import Record, Store
+
+logger = logging.getLogger(__name__)
 
 
-async def run_turn(store: Store, session_id: str, user_events: list[dict[str, Any]]) -> None:
+class TurnStore(Protocol):
+    async def get_session(self, session_id: str) -> Record | None: ...
+    async def get_agent(self, agent_id: str, version: int | None = None) -> Record | None: ...
+    async def create_event(self, session_id: str, event_type: str, content: Record) -> Record: ...
+    async def update_session(self, session_id: str, patch: Record) -> Record | None: ...
+
+
+class BufferedTurnStore:
+    def __init__(self, store: Store) -> None:
+        self._store = store
+        self.events: list[dict[str, Any]] = []
+        self.session_patch: dict[str, Any] = {}
+
+    async def get_session(self, session_id: str) -> Record | None:
+        return await self._store.get_session(session_id)
+
+    async def get_agent(self, agent_id: str, version: int | None = None) -> Record | None:
+        return await self._store.get_agent(agent_id, version=version)
+
+    async def create_event(self, session_id: str, event_type: str, content: Record) -> Record:
+        row = {
+            "id": len(self.events) + 1,
+            "session_id": session_id,
+            "type": event_type,
+            "content": content,
+        }
+        self.events.append({"type": event_type, "content": content})
+        return row
+
+    async def update_session(self, session_id: str, patch: Record) -> Record | None:
+        del session_id
+        self.session_patch.update(patch)
+        return None
+
+
+async def collect_turn(store: Store, session_id: str, user_events: list[dict[str, Any]]) -> dict[str, Any]:
+    buffered_store = BufferedTurnStore(store)
+    await run_turn(buffered_store, session_id, user_events)
+    return {
+        "events": buffered_store.events,
+        "session_patch": buffered_store.session_patch,
+    }
+
+
+async def run_turn(store: TurnStore, session_id: str, user_events: list[dict[str, Any]]) -> None:
     text = _extract_text(user_events)
     if await _run_claude_agent_sdk(store, session_id, text):
         return
 
+    logger.warning("Falling back to deterministic local turn", extra={"session_id": session_id})
     await _run_fallback_turn(store, session_id, text)
 
 
-async def _run_claude_agent_sdk(store: Store, session_id: str, text: str) -> bool:
+async def _run_claude_agent_sdk(store: TurnStore, session_id: str, text: str) -> bool:
     if not os.environ.get("ANTHROPIC_API_KEY"):
         return False
     if os.environ.get("HANGAR_USE_CLAUDE_AGENT_SDK", "1") == "0":
@@ -81,7 +129,7 @@ async def _run_claude_agent_sdk(store: Store, session_id: str, text: str) -> boo
 
 
 async def _run_claude_agent_sdk_in_container(
-    store: Store,
+    store: TurnStore,
     session_id: str,
     container_id: str,
     text: str,
@@ -95,7 +143,7 @@ async def _run_claude_agent_sdk_in_container(
         "system": agent.get("system"),
     }
     result = container.exec_run(
-        ["python", "-c", _CONTAINER_QUERY_SCRIPT],
+        ["python", "/opt/hangar/agent_runner.py"],
         environment={"HANGAR_TURN_PAYLOAD": json.dumps(payload)},
         workdir="/mnt/session/outputs",
     )
@@ -145,7 +193,7 @@ async def _run_claude_agent_sdk_in_container(
     return True
 
 
-async def _emit_sdk_message(store: Store, session_id: str, message: object) -> None:
+async def _emit_sdk_message(store: TurnStore, session_id: str, message: object) -> None:
     message_type = type(message).__name__
     content = getattr(message, "content", None)
     if message_type == "AssistantMessage" and content is not None:
@@ -185,11 +233,11 @@ async def _emit_sdk_message(store: Store, session_id: str, message: object) -> N
                         "output": block.get("content", ""),
                         "is_error": block.get("is_error"),
                     },
-            )
+                )
 
 
 async def _emit_sdk_payload(
-    store: Store,
+    store: TurnStore,
     session_id: str,
     event: dict[str, Any],
 ) -> None:
@@ -268,91 +316,7 @@ def _decode_exec_output(output: bytes | tuple[bytes | None, bytes | None]) -> st
     return output.decode()
 
 
-_CONTAINER_QUERY_SCRIPT = r"""
-from __future__ import annotations
-
-import asyncio
-import json
-import os
-import traceback
-from typing import Any
-
-from claude_agent_sdk import ClaudeAgentOptions, query
-
-
-async def prompts(text: str):
-    yield {
-        "type": "user",
-        "session_id": "",
-        "message": {"role": "user", "content": text},
-        "parent_tool_use_id": None,
-    }
-
-
-def block_to_dict(value: object) -> dict[str, Any]:
-    if isinstance(value, dict):
-        return value
-    if hasattr(value, "model_dump"):
-        return dict(value.model_dump())
-    if hasattr(value, "__dict__"):
-        data = {
-            key: item
-            for key, item in vars(value).items()
-            if not key.startswith("_")
-        }
-        block_type = type(value).__name__
-        if block_type == "TextBlock":
-            data["type"] = "text"
-        elif block_type == "ToolUseBlock":
-            data["type"] = "tool_use"
-        elif block_type == "ToolResultBlock":
-            data["type"] = "tool_result"
-        return data
-    return {"value": str(value)}
-
-
-async def main() -> None:
-    payload = json.loads(os.environ["HANGAR_TURN_PAYLOAD"])
-    options = ClaudeAgentOptions(
-        model=payload["model"],
-        system_prompt=payload.get("system"),
-        cwd="/mnt/session/outputs",
-        permission_mode="acceptEdits",
-        allowed_tools=["Bash", "Write"],
-        max_turns=5,
-    )
-    try:
-        async for message in query(
-            prompt=prompts(payload["prompt"]),
-            options=options,
-        ):
-            item = {"message_type": type(message).__name__}
-            content = getattr(message, "content", None)
-            if content is not None:
-                item["content"] = [block_to_dict(block) for block in content]
-            usage = getattr(message, "usage", None)
-            if usage is not None:
-                item["usage"] = block_to_dict(usage)
-            print(json.dumps(item), flush=True)
-    except Exception as exc:
-        print(
-            json.dumps(
-                {
-                    "message_type": "HangarError",
-                    "error": f"{type(exc).__name__}: {exc}",
-                    "traceback": traceback.format_exc(),
-                }
-            ),
-            flush=True,
-        )
-        raise
-
-
-asyncio.run(main())
-"""
-
-
-async def _run_fallback_turn(store: Store, session_id: str, text: str) -> None:
+async def _run_fallback_turn(store: TurnStore, session_id: str, text: str) -> None:
     lower = text.lower()
 
     if "list" in lower and "file" in lower:

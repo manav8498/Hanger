@@ -14,17 +14,18 @@ from hangar.api.routes import agents, api_keys, environments, events, sessions
 from hangar.db.models import Base
 from hangar.db.session import make_engine, make_sessionmaker
 from hangar.store import MemoryStore, PostgresStore, Store
+from hangar.workflows.runtime import make_workflow_runtime
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    app.state.background_tasks = set()
     app.state.engine = None
     app.state.store = await _make_store(app)
-    await _resume_starting_sessions(app.state.store)
+    app.state.workflow_runtime = make_workflow_runtime(app.state.store)
+    await app.state.workflow_runtime.start()
+    await app.state.workflow_runtime.resume_sessions()
     yield
-    for task in set(app.state.background_tasks):
-        task.cancel()
+    await app.state.workflow_runtime.shutdown()
     if app.state.engine is not None:
         await app.state.engine.dispose()
 
@@ -72,14 +73,3 @@ async def _make_store(app: FastAPI) -> Store:
         await connection.run_sync(Base.metadata.create_all)
     app.state.engine = engine
     return PostgresStore(make_sessionmaker(engine))
-
-
-async def _resume_starting_sessions(store: Store) -> None:
-    for session in await store.list_sessions(limit=1000):
-        if session["status"] == "starting":
-            await store.update_session(session["id"], {"status": "error"})
-            await store.create_event(
-                session["id"],
-                "session.error",
-                {"message": "Session was interrupted during startup."},
-            )

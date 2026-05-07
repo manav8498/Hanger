@@ -1,14 +1,13 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Coroutine
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 
 from hangar.api.deps import get_store, require_api_key
 from hangar.api.schemas import SessionCreateRequest
-from hangar.runtime.container import provision_container, terminate_container
+from hangar.runtime.container import terminate_container
 from hangar.store import Store, render_session
 from hangar.utils.ids import new_id
 from hangar.utils.time import utc_now
@@ -47,12 +46,7 @@ async def create_session(
             "title": body.title,
         }
     )
-    await store.create_event(
-        row["id"],
-        "session.status_starting",
-        {"session_id": row["id"], "ts": utc_now().isoformat()},
-    )
-    _track_task(request, _provision_session(store, row["id"], environment["config"]))
+    await request.app.state.workflow_runtime.start_session(row["id"])
     return render_session(row)
 
 
@@ -78,13 +72,15 @@ async def get_session(
 
 @router.post("/{session_id}/terminate")
 async def terminate_session(
+    request: Request,
     session_id: str,
     store: Annotated[Store, Depends(get_store)],
 ) -> dict[str, object]:
     row = await store.get_session(session_id)
     if row is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
-    await asyncio.to_thread(terminate_container, row.get("container_id"))
+    await request.app.state.workflow_runtime.send_user_events(session_id, [{"type": "terminate"}])
+    await terminate_container_async(row.get("container_id"))
     updated = await store.update_session(
         session_id,
         {
@@ -109,41 +105,16 @@ async def delete_session(
     row = await store.get_session(session_id)
     if row is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
-    await asyncio.to_thread(terminate_container, row.get("container_id"))
+    await terminate_container_async(row.get("container_id"))
     await store.delete_session(session_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-async def _provision_session(
-    store: Store,
-    session_id: str,
-    environment_config: dict[str, Any],
-) -> None:
-    try:
-        handle = await provision_container(environment_config, session_id)
-    except Exception as exc:
-        await store.update_session(session_id, {"status": "error", "stop_reason": {"type": "error"}})
-        await store.create_event(session_id, "session.error", {"message": str(exc)})
-        return
-
-    await store.update_session(
-        session_id,
-        {"status": "running", "container_id": handle.id},
-    )
-    await store.create_event(
-        session_id,
-        "session.status_running",
-        {"session_id": session_id, "ts": utc_now().isoformat()},
-    )
+async def terminate_container_async(container_id: object) -> None:
+    await asyncio.to_thread(terminate_container, container_id if isinstance(container_id, str) else None)
 
 
 def _agent_ref(agent: str | dict[str, Any]) -> tuple[str, int | None]:
     if isinstance(agent, str):
         return agent, None
     return str(agent["id"]), int(agent["version"]) if "version" in agent else None
-
-
-def _track_task(request: Request, coroutine: Coroutine[Any, Any, None]) -> None:
-    task = asyncio.create_task(coroutine)
-    request.app.state.background_tasks.add(task)
-    task.add_done_callback(request.app.state.background_tasks.discard)

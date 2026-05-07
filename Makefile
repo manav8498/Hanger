@@ -1,13 +1,10 @@
 UV ?= uv
 
-.PHONY: dev migrate lint typecheck test compat clean
+.PHONY: dev lint typecheck test compat clean
 
 dev:
 	docker compose up -d
 	docker compose logs -f api
-
-migrate:
-	$(UV) run alembic upgrade head
 
 lint:
 	$(UV) run ruff check .
