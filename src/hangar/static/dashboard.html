@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Hangar</title>
+    <link rel="icon" href="data:,">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap">
+    <link rel="stylesheet" href="dashboard.css">
+  </head>
+  <body>
+    <div class="shell">
+      <header class="topbar">
+        <a class="brand" href="#/">Hangar</a>
+        <nav class="nav" aria-label="Dashboard sections">
+          <a href="#/">Overview</a>
+          <a href="#/agents">Agents</a>
+          <a href="#/environments">Environments</a>
+          <a href="#/sessions">Sessions</a>
+        </nav>
+        <button id="logout" class="ghost" type="button">Log out</button>
+      </header>
+
+      <div id="banner" class="banner hidden"></div>
+      <main id="app" class="content" tabindex="-1"></main>
+    </div>
+
+    <aside id="side-panel" class="side-panel" aria-live="polite" aria-hidden="true">
+      <div class="side-panel-header">
+        <h2 id="side-panel-title">Details</h2>
+        <button id="side-panel-close" class="ghost" type="button">Close</button>
+      </div>
+      <pre id="side-panel-json"></pre>
+    </aside>
+
+    <div id="auth-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="auth-title">
+      <form id="auth-form" class="modal-card">
+        <h1 id="auth-title">Hangar API key</h1>
+        <input id="api-key" type="password" autocomplete="off" placeholder="hgr_test_key" required>
+        <div class="modal-actions">
+          <button class="primary" type="submit">Save</button>
+          <button id="auth-cancel" class="ghost" type="button">Cancel</button>
+        </div>
+      </form>
+    </div>
+
+    <script src="dashboard.js" defer></script>
+  </body>
+</html>

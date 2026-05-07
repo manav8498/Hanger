@@ -3,11 +3,13 @@ from __future__ import annotations
 import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.exceptions import HTTPException, RequestValidationError
 from fastapi.requests import Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 
 from hangar import __version__
 from hangar.api.routes import (
@@ -44,6 +46,21 @@ app.include_router(environments.router)
 app.include_router(sessions.router)
 app.include_router(events.router)
 app.include_router(health_routes.router)
+
+STATIC_DIR = Path(__file__).resolve().parents[1] / "static"
+
+
+@app.get("/dashboard", include_in_schema=False)
+async def dashboard_redirect() -> RedirectResponse:
+    return RedirectResponse(url="/dashboard/")
+
+
+@app.get("/dashboard/", include_in_schema=False)
+async def dashboard_index() -> FileResponse:
+    return FileResponse(STATIC_DIR / "dashboard.html")
+
+
+app.mount("/dashboard", StaticFiles(directory=STATIC_DIR, html=True), name="dashboard")
 
 
 @app.get("/")

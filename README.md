@@ -185,6 +185,13 @@ hangar session stream ses_xxx
 hangar session terminate ses_xxx
 ```
 
+## Dashboard
+
+A read-only web dashboard is available at `http://localhost:8080/dashboard/` once the stack is up.
+Use it to watch session events stream in real time during local development.
+The dashboard is observe-only - for mutations, use the CLI or API directly.
+API key prompt appears on first load; the key is stored in browser localStorage.
+
 ## Limitations
 
 - No vault primitive. Secrets must be passed via environment variables on the host.
@@ -192,7 +199,7 @@ hangar session terminate ses_xxx
 - Single-org only. No multi-tenant separation in v0.1 / v0.2.
 - No agent-to-agent calls.
 - No alternative sandbox runtimes (Firecracker, gVisor) yet - Docker containers only.
-- The dashboard (Task 2.5) is observe-only. Use the CLI or API for any mutations.
+- The dashboard is observe-only. Use the CLI or API for any mutations.
 
 ## Contributing
 
