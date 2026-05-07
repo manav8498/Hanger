@@ -145,7 +145,45 @@ flowchart LR
 
 ## CLI usage
 
-A full `hangar` CLI lands in v0.2 (Task 2.3). Today, the only CLI command is `hangar admin create-api-key --name <name>`.
+All CLI commands default to `--url http://localhost:8080` and `--api-key $HANGAR_API_KEY`, falling back to `hgr_test_key` for local development.
+
+### Admin
+
+```sh
+hangar admin create-api-key --name dev
+hangar admin health
+hangar version
+```
+
+### Agents
+
+```sh
+hangar agent create --name "test-agent" --model "claude-opus-4-7" --system "Be brief."
+hangar agent list
+hangar agent get agent_xxx
+hangar agent archive agent_xxx
+```
+
+### Environments
+
+```sh
+hangar env create --name "default-env"
+hangar env list
+hangar env get env_xxx
+```
+
+### Sessions
+
+```sh
+# Create your first agent and run a session
+hangar agent create --name "test-agent" --model "claude-opus-4-7" \
+    --system "Be brief."
+hangar env create --name "default-env"
+hangar session create --agent agent_xxx --env env_xxx
+hangar session send ses_xxx --message "What is 2+2?"
+hangar session stream ses_xxx
+hangar session terminate ses_xxx
+```
 
 ## Limitations
 
