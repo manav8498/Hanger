@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import os
 import shlex
 import tarfile
@@ -27,7 +28,7 @@ async def provision_container(env_config: dict[str, Any], session_id: str) -> Co
             name=f"hangar-{session_id}",
             outputs_host_path=_outputs_path(session_id),
         )
-    return _provision_container_sync(env_config, session_id)
+    return await asyncio.to_thread(_provision_container_sync, env_config, session_id)
 
 
 def terminate_container(container_id: str | None) -> None:

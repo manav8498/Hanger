@@ -50,6 +50,13 @@ class BufferedTurnStore:
         *,
         dedupe_key: str | None = None,
     ) -> Record:
+        # dedupe_key is intentionally discarded here. The buffered store
+        # is single-use within one run_agent_turn DBOS step -- its events
+        # only become real (with dedupe keys) when the workflow loop
+        # replays them through emit_event after the step returns. Adding
+        # a dedupe key inside the buffer would be redundant and would
+        # actually break replay, because the step's journaled return value
+        # is what DBOS uses on retry, not the buffer state.
         del dedupe_key
         row = {
             "id": len(self.events) + 1,
