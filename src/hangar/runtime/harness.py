@@ -19,7 +19,14 @@ logger = logging.getLogger(__name__)
 class TurnStore(Protocol):
     async def get_session(self, session_id: str) -> Record | None: ...
     async def get_agent(self, agent_id: str, version: int | None = None) -> Record | None: ...
-    async def create_event(self, session_id: str, event_type: str, content: Record) -> Record: ...
+    async def create_event(
+        self,
+        session_id: str,
+        event_type: str,
+        content: Record,
+        *,
+        dedupe_key: str | None = None,
+    ) -> Record: ...
     async def update_session(self, session_id: str, patch: Record) -> Record | None: ...
 
 
@@ -35,7 +42,15 @@ class BufferedTurnStore:
     async def get_agent(self, agent_id: str, version: int | None = None) -> Record | None:
         return await self._store.get_agent(agent_id, version=version)
 
-    async def create_event(self, session_id: str, event_type: str, content: Record) -> Record:
+    async def create_event(
+        self,
+        session_id: str,
+        event_type: str,
+        content: Record,
+        *,
+        dedupe_key: str | None = None,
+    ) -> Record:
+        del dedupe_key
         row = {
             "id": len(self.events) + 1,
             "session_id": session_id,

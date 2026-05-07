@@ -45,7 +45,14 @@ class Store(Protocol):
     async def list_sessions(self, limit: int = 100) -> list[Record]: ...
     async def update_session(self, session_id: str, patch: Record) -> Record | None: ...
     async def delete_session(self, session_id: str) -> bool: ...
-    async def create_event(self, session_id: str, event_type: str, content: Record) -> Record: ...
+    async def create_event(
+        self,
+        session_id: str,
+        event_type: str,
+        content: Record,
+        *,
+        dedupe_key: str | None = None,
+    ) -> Record: ...
     async def list_events(
         self,
         session_id: str,
@@ -258,14 +265,26 @@ class MemoryStore:
     async def delete_session(self, session_id: str) -> bool:
         return self.sessions.pop(session_id, None) is not None
 
-    async def create_event(self, session_id: str, event_type: str, content: Record) -> Record:
+    async def create_event(
+        self,
+        session_id: str,
+        event_type: str,
+        content: Record,
+        *,
+        dedupe_key: str | None = None,
+    ) -> Record:
         async with self._condition:
+            if dedupe_key is not None:
+                for existing in self.events:
+                    if existing.get("dedupe_key") == dedupe_key:
+                        return dict(existing)
             self._event_id += 1
             row = {
                 "id": self._event_id,
                 "session_id": session_id,
                 "type": event_type,
                 "content": content,
+                "dedupe_key": dedupe_key,
                 "processed_at": None,
                 "created_at": utc_now(),
             }
@@ -576,9 +595,27 @@ class PostgresStore:
             await session.commit()
             return True
 
-    async def create_event(self, session_id: str, event_type: str, content: Record) -> Record:
+    async def create_event(
+        self,
+        session_id: str,
+        event_type: str,
+        content: Record,
+        *,
+        dedupe_key: str | None = None,
+    ) -> Record:
         async with self._sessionmaker() as session:
-            row = models.Event(session_id=session_id, type=event_type, content=content)
+            if dedupe_key is not None:
+                existing = await session.scalar(
+                    select(models.Event).where(models.Event.dedupe_key == dedupe_key)
+                )
+                if existing is not None:
+                    return _event_row(existing)
+            row = models.Event(
+                session_id=session_id,
+                type=event_type,
+                content=content,
+                dedupe_key=dedupe_key,
+            )
             session.add(row)
             await session.flush()
             await session.execute(

@@ -40,8 +40,14 @@ async def emit_event(
     session_id: str,
     event_type: str,
     content: dict[str, Any],
+    dedupe_key: str | None = None,
 ) -> dict[str, Any]:
-    return await workflow_store().create_event(session_id, event_type, content)
+    return await workflow_store().create_event(
+        session_id,
+        event_type,
+        content,
+        dedupe_key=dedupe_key,
+    )
 
 
 @DBOS.step(name="update_session")

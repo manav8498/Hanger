@@ -72,6 +72,7 @@ class Event(Base):
     session_id: Mapped[str] = mapped_column(String, index=True)
     type: Mapped[str] = mapped_column(Text)
     content: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    dedupe_key: Mapped[str | None] = mapped_column(Text, unique=True, nullable=True)
     processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

@@ -33,6 +33,7 @@ async def _session_loop(session_id: str, receive: ReceiveMessage) -> None:
         session_id,
         "session.status_starting",
         {"session_id": session_id, "ts": utc_now().isoformat()},
+        f"{session_id}:session.status_starting",
     )
 
     environment_config = await load_session_environment(session_id)
@@ -42,6 +43,7 @@ async def _session_loop(session_id: str, receive: ReceiveMessage) -> None:
         session_id,
         "session.status_running",
         {"session_id": session_id, "ts": utc_now().isoformat()},
+        f"{session_id}:session.status_running",
     )
 
     while True:
@@ -53,23 +55,30 @@ async def _session_loop(session_id: str, receive: ReceiveMessage) -> None:
         user_events = message.get("events")
         if not isinstance(user_events, list):
             continue
+        message_id = str(message.get("message_id", "unknown"))
 
         await update_session(session_id, {"status": "running", "stop_reason": None})
-        for event in user_events:
+        for index, event in enumerate(user_events):
             if isinstance(event, dict):
                 await emit_event(
                     session_id,
                     str(event.get("type", "user.message")),
                     _event_content(event),
+                    f"{session_id}:{message_id}:input:{index}",
                 )
 
         turn_result = await run_agent_turn(session_id, _typed_events(user_events))
-        for event in turn_result.get("events", []):
+        for index, event in enumerate(turn_result.get("events", [])):
             if isinstance(event, dict):
                 event_type = event.get("type")
                 content = event.get("content")
                 if isinstance(event_type, str) and isinstance(content, dict):
-                    await emit_event(session_id, event_type, content)
+                    await emit_event(
+                        session_id,
+                        event_type,
+                        content,
+                        f"{session_id}:{message_id}:output:{index}",
+                    )
 
         session_patch = turn_result.get("session_patch")
         if isinstance(session_patch, dict) and session_patch:

@@ -9,6 +9,7 @@ from dbos import DBOS, DBOSConfig, SetWorkflowID
 
 from hangar.db.session import database_url
 from hangar.store import Store
+from hangar.utils.ids import new_id
 from hangar.workflows.session import (
     USER_EVENTS_TOPIC,
     WORKFLOW_STATUSES,
@@ -54,7 +55,7 @@ class LocalWorkflowRuntime:
 
     async def send_user_events(self, session_id: str, events: list[dict[str, Any]]) -> None:
         await self.start_session(session_id)
-        await self._queues[session_id].put({"events": events})
+        await self._queues[session_id].put({"message_id": new_id("evt"), "events": events})
 
     async def resume_sessions(self) -> None:
         for session in await self._store.list_sessions(limit=1000):
@@ -98,7 +99,11 @@ class DBOSWorkflowRuntime:
 
     async def send_user_events(self, session_id: str, events: list[dict[str, Any]]) -> None:
         await self._ensure_workflow_receives(session_id)
-        await DBOS.send_async(session_id, {"events": events}, USER_EVENTS_TOPIC)
+        await DBOS.send_async(
+            session_id,
+            {"message_id": new_id("evt"), "events": events},
+            USER_EVENTS_TOPIC,
+        )
 
     async def resume_sessions(self) -> None:
         for session in await self._store.list_sessions(limit=1000):
