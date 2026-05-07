@@ -1,5 +1,6 @@
 .DS_Store
 .env
+.hangar/
 .idea/
 .mypy_cache/
 .pytest_cache/

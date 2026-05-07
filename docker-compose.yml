@@ -7,6 +7,7 @@ services:
       HANGAR_ADMIN_TOKEN: ${HANGAR_ADMIN_TOKEN:-dev-admin-token}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       HANGAR_RUNTIME_MODE: ${HANGAR_RUNTIME_MODE:-docker}
+      HANGAR_DOCKER_HOST_SESSIONS_ROOT: ${HANGAR_DOCKER_HOST_SESSIONS_ROOT:-}
     ports:
       - "8080:8080"
     depends_on:
@@ -14,7 +15,7 @@ services:
         condition: service_healthy
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - hangar_sessions:/var/lib/hangar/sessions
+      - ${HANGAR_DOCKER_HOST_SESSIONS_ROOT:-./.hangar/sessions}:/var/lib/hangar/sessions
 
   postgres:
     image: postgres:16-alpine
@@ -31,5 +32,4 @@ services:
       - postgres_data:/var/lib/postgresql/data
 
 volumes:
-  hangar_sessions:
   postgres_data:

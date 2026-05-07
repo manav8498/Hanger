@@ -35,14 +35,24 @@ async def _run_claude_agent_sdk(store: Store, session_id: str, text: str) -> boo
         model=str(agent["model"]["id"]),
         system_prompt=agent.get("system"),
         cwd=Path(_outputs_path(session_id)),
-        permission_mode="bypassPermissions",
+        permission_mode="acceptEdits",
+        max_turns=5,
     )
 
     try:
         async for message in query(prompt=text, options=options):
             await _emit_sdk_message(store, session_id, message)
     except Exception:
-        return False
+        await store.create_event(
+            session_id,
+            "session.error",
+            {"message": "Claude Agent SDK turn failed."},
+        )
+        await store.update_session(
+            session_id,
+            {"status": "error", "stop_reason": {"type": "error"}},
+        )
+        return True
 
     await store.create_event(
         session_id,
@@ -85,18 +95,40 @@ async def _emit_sdk_message(store: Store, session_id: str, message: object) -> N
                 "span.model_request_end",
                 {"usage": _to_jsonable(usage)},
             )
+    elif message_type == "UserMessage" and content is not None:
+        blocks = [_to_jsonable(block) for block in content]
+        for block in blocks:
+            if block.get("type") == "tool_result":
+                await store.create_event(
+                    session_id,
+                    "agent.tool_result",
+                    {
+                        "output": block.get("content", ""),
+                        "is_error": block.get("is_error"),
+                    },
+                )
 
 
 def _to_jsonable(value: object) -> dict[str, Any]:
+    if isinstance(value, dict):
+        return value
     if hasattr(value, "model_dump"):
         dumped = value.model_dump()
         return dict(dumped)
     if hasattr(value, "__dict__"):
-        return {
+        data = {
             key: item
             for key, item in vars(value).items()
             if not key.startswith("_")
         }
+        block_type = type(value).__name__
+        if block_type == "TextBlock":
+            data["type"] = "text"
+        elif block_type == "ToolUseBlock":
+            data["type"] = "tool_use"
+        elif block_type == "ToolResultBlock":
+            data["type"] = "tool_result"
+        return data
     return {"value": str(value)}
 
 

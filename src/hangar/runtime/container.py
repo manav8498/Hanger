@@ -41,7 +41,9 @@ def _provision_container_sync(env_config: dict[str, Any], session_id: str) -> Co
     image = "python:3.12-slim"
     name = f"hangar-{session_id}"
     outputs_path = _outputs_path(session_id)
+    outputs_host_path = _outputs_host_path(session_id)
     Path(outputs_path).mkdir(parents=True, exist_ok=True)
+    Path(outputs_host_path).mkdir(parents=True, exist_ok=True)
 
     packages = env_config.get("packages", {})
     pip_packages = packages.get("pip", [])
@@ -54,7 +56,11 @@ def _provision_container_sync(env_config: dict[str, Any], session_id: str) -> Co
     try:
         existing = client.containers.get(name)
         existing.reload()
-        return ContainerHandle(id=str(existing.id), name=name, outputs_host_path=outputs_path)
+        return ContainerHandle(
+            id=str(existing.id),
+            name=name,
+            outputs_host_path=outputs_host_path,
+        )
     except docker.errors.NotFound:
         pass
 
@@ -65,11 +71,18 @@ def _provision_container_sync(env_config: dict[str, Any], session_id: str) -> Co
         name=name,
         mem_limit="2g",
         nano_cpus=1_000_000_000,
-        volumes={outputs_path: {"bind": "/mnt/session/outputs", "mode": "rw"}},
+        volumes={outputs_host_path: {"bind": "/mnt/session/outputs", "mode": "rw"}},
     )
-    return ContainerHandle(id=str(container.id), name=name, outputs_host_path=outputs_path)
+    return ContainerHandle(id=str(container.id), name=name, outputs_host_path=outputs_host_path)
 
 
 def _outputs_path(session_id: str) -> str:
     root = os.environ.get("HANGAR_SESSIONS_ROOT", "/var/lib/hangar/sessions")
     return str(Path(root) / session_id / "outputs")
+
+
+def _outputs_host_path(session_id: str) -> str:
+    root = os.environ.get("HANGAR_DOCKER_HOST_SESSIONS_ROOT")
+    if root:
+        return str(Path(root) / session_id / "outputs")
+    return _outputs_path(session_id)
