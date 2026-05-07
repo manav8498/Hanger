@@ -1,20 +1,53 @@
 # Changelog
 
-## v0.2.0
+All notable changes to Hangar are documented in this file.
+Format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/).
 
-- Added the HTTP-backed `hangar` CLI for agents, environments, sessions, streaming, admin key creation, health, and version checks.
-- Added `/healthz` and `/readyz` with database, DBOS/runtime, and Docker component status.
-- Added a read-only static dashboard at `/dashboard/` for local instance health, resource tables, and live session event streams.
-- Added `scripts/install.sh` for one-command local installation with Docker Compose, `.env` generation, health waiting, and next-step output.
-- Expanded the README with quickstart, API compatibility, architecture, configuration, CLI usage, dashboard notes, and limitations.
-- Removed Alembic runtime setup in favor of `Base.metadata.create_all` for v0.1/v0.2 schema creation.
-- Moved cold Docker session provisioning work off the FastAPI event loop.
+## [0.2.0] - 2026-05-08
 
-## v0.1.0-alpha
+### Added
+- One-line install via `scripts/install.sh` (`curl -fsSL ... | sh`).
+- Read-only web dashboard at `/dashboard/` for live session
+  observation. Vanilla JS, dark mode, hash-routed across five
+  views, live SSE event stream with `Last-Event-ID` resume.
+- `/healthz` and `/readyz` endpoints with concurrent component
+  checks (database, dbos, docker) and 500ms per-check timeouts.
+- Full HTTP-backed CLI: `hangar agent|env|session|admin|version`
+  with global `--url` and `--api-key` flags.
+- `hangar admin health` command for component-level status.
+- `docs/api-compat.md` documenting the 25-row endpoint
+  compatibility matrix.
 
-- Implemented the Phase 1 Claude Managed Agents compatibility surface: Agent, Environment, Session, and Event primitives.
-- Added Anthropic Python SDK compatibility for local `base_url` usage without SDK monkey-patching.
-- Added Postgres-backed storage, DBOS-backed session workflow runtime, and Docker container provisioning for sessions.
-- Added SSE event streaming at `/v1/sessions/{id}/events/stream` with `Last-Event-ID` resume support.
-- Added API-key authentication, admin API-key creation, audit logging, and a deterministic `hgr_test_key` local-development path.
-- Added fallback harness behavior for test and no-API-key development paths.
+### Changed
+- README rewritten with Quickstart, Anthropic SDK drop-in
+  example, configuration table, and architecture diagram.
+- `HANGAR_SESSION_BASE_IMAGE` default corrected from a
+  placeholder image tag to `python:3.12-slim`.
+- Cold Docker session provisioning moved off the FastAPI
+  event loop via `asyncio.to_thread`.
+
+### Removed
+- Alembic dependency and `migrations/` directory. DBOS owns
+  schema management; the FastAPI lifespan calls
+  `Base.metadata.create_all` for v0.1/v0.2 schema bootstrap.
+
+## [0.1.0-alpha] - 2026-05-06
+
+### Added
+- Initial four-primitive API surface (Agent, Environment,
+  Session, Event) compatible with Anthropic's Claude Managed
+  Agents.
+- Anthropic Python SDK drop-in compatibility, verified by
+  `tests/test_compat_anthropic_sdk.py`.
+- DBOS-backed durable session workflow with deterministic
+  replay across API restarts.
+- SSE event stream at `/v1/sessions/{id}/events/stream` with
+  `Last-Event-ID` resume.
+- Argon2-hashed API key auth via `Authorization: Bearer` or
+  `X-API-Key` headers.
+- `hgr_test_key` local-development bypass, gated by the
+  `HANGAR_ACCEPT_TEST_KEY` environment variable.
+- Dual storage: in-memory for tests, Postgres for production.
+- Audit logging for authentication and admin events.
+- Deterministic fallback harness when `ANTHROPIC_API_KEY` is
+  unset.

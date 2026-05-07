@@ -39,3 +39,61 @@ Hangar targets the Claude Managed Agents API surface used by the official Anthro
 | Create API key | `POST /v1/api-keys` | admin token | Requires `x-admin-token`. |
 | Dashboard redirect | `GET /dashboard` | none | Redirects to `/dashboard/`. |
 | Dashboard app | `GET /dashboard/` | none | Serves the static dashboard shell; API calls still require an API key. |
+
+## Headers
+
+The following HTTP headers are accepted on requests:
+
+| Header | Status | Notes |
+|---|---|---|
+| `Authorization: Bearer <key>` | accepted | The Anthropic Python SDK uses this by default. |
+| `x-api-key: <key>` | accepted | Either header works; Hangar checks both. |
+| `anthropic-beta: managed-agents-2026-04-01` | accepted, ignored | Hangar always behaves as if the beta header were set. |
+| `Last-Event-ID: <int>` | accepted | On `/v1/sessions/{id}/events/stream` for SSE resume. |
+| `x-admin-token: <token>` | accepted | Required only for `POST /v1/api-keys`. |
+
+## Response shapes
+
+All Hangar endpoints return JSON with the same field shapes
+as the documented Anthropic Claude Managed Agents API. Errors
+use the Anthropic envelope:
+
+```json
+{"error": {"type": "...", "message": "..."}}
+```
+
+The Anthropic Python SDK's error parser unwraps this envelope
+correctly. Hangar response shapes are also exercised by the
+SDK in `tests/test_compat_anthropic_sdk.py`, which fails if
+any field is missing or mistyped.
+
+## What's not compatible
+
+- The Anthropic vault primitive is not implemented. Pass
+  secrets via host environment variables instead.
+- The `limited` networking config is accepted on environment
+  create but not enforced inside session containers - sessions
+  currently get unrestricted egress regardless of the config
+  value.
+- The `requires_action` event flow for custom-tool result
+  pause/resume is not yet supported. Sessions that complete
+  normally with `end_turn` work; sessions that would otherwise
+  pause for a custom tool result do not currently round-trip.
+- Anthropic-hosted spans, traces, and analytics are not
+  mirrored.
+
+## Verifying compatibility yourself
+
+The compat test that gates every release is
+`tests/test_compat_anthropic_sdk.py`. It uses the unmodified
+Anthropic Python SDK and runs the full lifecycle. To run it
+against your own Hangar instance:
+
+```sh
+HANGAR_RUN_COMPAT=1 HANGAR_URL=http://localhost:8080 \
+  HANGAR_API_KEY=hgr_test_key make compat
+```
+
+Three tests run: `test_create_agent`, `test_create_environment`,
+`test_full_session_lifecycle`. All three must pass before any
+Hangar release is tagged.

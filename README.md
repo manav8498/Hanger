@@ -121,6 +121,8 @@ Hangar targets the Phase 1 Claude Managed Agents surface from the [Anthropic CMA
 | Vault | - | not yet |
 | Networking restrictions | accepted, not enforced | partial |
 
+See [docs/api-compat.md](docs/api-compat.md) for the full endpoint matrix, headers, and Hangar-only routes.
+
 ## Architecture
 
 FastAPI on port 8080 fronts a Postgres-backed event log and a DBOS workflow per session.
@@ -211,6 +213,7 @@ API key prompt appears on first load; the key is stored in browser localStorage.
 - No agent-to-agent calls.
 - No alternative sandbox runtimes (Firecracker, gVisor) yet - Docker containers only.
 - The dashboard is observe-only. Use the CLI or API for any mutations.
+- By default, Hangar accepts `hgr_test_key` as a valid API key for local development. Set `HANGAR_ACCEPT_TEST_KEY=0` in `.env` and restart the API container before exposing port 8080 beyond localhost.
 
 ## Contributing
 
