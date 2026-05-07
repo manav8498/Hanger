@@ -442,7 +442,7 @@ def _print_event_history(
 
 def _print_sse_event(event: ServerSentEvent, *, verbose: bool) -> None:
     content = _parse_event_data(event.data)
-    _print_event_line(event.event, content, created_at=_event_created_at(content), verbose=verbose)
+    _print_event_line(event.event, content, created_at=None, verbose=verbose)
 
 
 def _print_event_line(
@@ -495,14 +495,11 @@ def _content_text(content: JsonObject) -> str:
 def _time_label(created_at: str | None) -> str:
     if created_at:
         try:
-            return datetime.fromisoformat(created_at.replace("Z", "+00:00")).strftime("%H:%M:%S")
+            parsed = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+            return parsed.astimezone().strftime("%H:%M:%S")
         except ValueError:
             pass
-    return datetime.now().strftime("%H:%M:%S")
-
-
-def _event_created_at(content: JsonObject) -> str | None:
-    return _optional_string(content.get("created_at")) or _optional_string(content.get("ts"))
+    return datetime.now().astimezone().strftime("%H:%M:%S")
 
 
 def _truncate(value: str, limit: int = 80) -> str:

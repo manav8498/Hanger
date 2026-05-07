@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import time
 from collections.abc import Iterator
+from datetime import datetime
 from types import TracebackType
 from typing import Any, Literal, cast
 
@@ -157,6 +158,13 @@ def test_auth_failure_prints_401(runner: CliRunner) -> None:
 
     assert result.exit_code != 0
     assert "401" in _combined_output(result)
+
+
+def test_time_label_converts_utc_timestamp_to_local_time() -> None:
+    known = "2026-05-07T19:58:53.000Z"
+    expected = datetime.fromisoformat(known.replace("Z", "+00:00")).astimezone().strftime("%H:%M:%S")
+
+    assert cli._time_label(known) == expected
 
 
 def _wait_for_running(runner: CliRunner, session_id: str) -> dict[str, Any]:
